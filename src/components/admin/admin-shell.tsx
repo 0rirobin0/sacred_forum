@@ -11,7 +11,12 @@ import { LogoutButton } from "@/components/admin/logout-button";
 import { cn } from "@/lib/utils";
 
 type AdminShellProps = {
-  activePath: "/admin" | "/admin/approvals" | "/admin/expenses" | "/admin/members";
+  activePath:
+    | "/admin"
+    | "/admin/approvals"
+    | "/admin/expenses"
+    | "/admin/members"
+    | "/admin/financial-analytics";
   eyebrow?: string;
   title: string;
   description?: string;
@@ -20,10 +25,10 @@ type AdminShellProps = {
 
 const sidebarItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin" },
-  { label: "Member Directory", icon: Users2, href: "/admin/members" },
-  { label: "Fund Approvals", icon: CircleCheckBig, href: "/admin/approvals" },
-  { label: "Expense Entries", icon: CircleDollarSign, href: "/admin/expenses" },
-  { label: "Financial Analytics", icon: ChartColumnBig, href: "/admin" },
+  { label: "Member List", icon: Users2, href: "/admin/members" },
+  { label: "Add Fund and Approvals", icon: CircleCheckBig, href: "/admin/approvals" },
+  { label: "Add Expense", icon: CircleDollarSign, href: "/admin/expenses" },
+  { label: "Financial History", icon: ChartColumnBig, href: "/admin/financial-analytics" },
 ] as const;
 
 export function AdminShell({
@@ -36,7 +41,7 @@ export function AdminShell({
   return (
     <main className="min-h-screen bg-[#f8f4ec] text-primary">
       <div className="lg:flex">
-        <aside className="flex w-full flex-col bg-primary px-4 py-4 text-primary-foreground shadow-[18px_0_40px_rgba(0,56,32,0.28)] sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:h-screen lg:w-90 lg:px-7 lg:py-7">
+        <aside className="flex w-full flex-col border-r border-primary-foreground/15 bg-primary px-4 py-4 text-primary-foreground shadow-[18px_0_40px_rgba(0,56,32,0.28)] sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:h-screen lg:w-90 lg:px-7 lg:py-7">
           <div>
             <h1 className="headline-display text-xl font-extrabold leading-tight sm:text-2xl lg:text-3xl">
               The Sacred Editorial
@@ -56,10 +61,10 @@ export function AdminShell({
                   key={item.label}
                   href={item.href}
                   className={cn(
-                    "flex w-full items-center justify-center gap-2 rounded-[1.05rem] px-3 py-2 text-xs font-medium text-center transition-colors sm:justify-start sm:gap-3 sm:px-4 sm:py-2.5 sm:text-sm md:py-2 md:text-xs lg:gap-4 lg:rounded-r-[1.8rem] lg:rounded-l-[1.35rem] lg:px-5 lg:py-3.5 lg:text-base",
+                    "flex w-full items-center justify-center gap-2 rounded-[1.05rem] border px-3 py-2 text-center text-xs font-medium leading-snug transition-colors sm:justify-start sm:gap-3 sm:px-4 sm:py-2.5 sm:text-sm md:py-2 md:text-xs lg:gap-4 lg:rounded-r-[1.8rem] lg:rounded-l-[1.35rem] lg:px-5 lg:py-3.5 lg:text-base",
                     isActive
-                      ? "bg-primary-foreground text-primary shadow-[0_10px_18px_rgba(0,0,0,0.12)] lg:border-r-4 lg:border-secondary"
-                      : "text-primary-foreground/85 hover:bg-primary-foreground/10 hover:text-primary-foreground",
+                      ? "border-primary-foreground bg-primary-foreground text-primary shadow-[0_10px_18px_rgba(0,0,0,0.12)] lg:border-r-4 lg:border-r-secondary"
+                      : "border-primary-foreground/15 text-primary-foreground/85 hover:border-primary-foreground/30 hover:bg-primary-foreground/10 hover:text-primary-foreground",
                   )}
                 >
                   <Icon className="size-4 sm:size-5 lg:size-6" />
@@ -86,12 +91,12 @@ export function AdminShell({
             </div>
           </header>
 
-          <section className="mb-6 md:mb-7 lg:mb-10">
+          <section className="mb-6 border-b border-[#ded6c8] pb-6 md:mb-7 lg:mb-10 lg:pb-8">
             <h2 className="headline-display text-xl font-extrabold leading-tight text-primary sm:text-2xl md:text-[1.9rem] lg:text-4xl xl:text-5xl">
               {title}
             </h2>
             {description ? (
-              <p className="mt-3 max-w-4xl text-sm text-primary/75 bengali-copy sm:mt-4 sm:text-base lg:mt-5">
+              <p className="mt-3 max-w-4xl text-sm text-primary/80 bengali-copy sm:mt-4 sm:text-base lg:mt-5">
                 {description}
               </p>
             ) : null}

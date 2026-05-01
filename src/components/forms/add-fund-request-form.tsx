@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Banknote, CheckCheck, NotebookPen, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -92,6 +93,15 @@ export function AddFundRequestForm({ members }: AddFundRequestFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">
+      <div className="rounded-[1.5rem] border border-dashed border-secondary/40 bg-secondary/10 px-4 py-4 text-sm text-secondary bengali-copy">
+        <p>আপনি সদস্য তালিকায় নেই? আগে সদস্য হন, তারপর ফান্ড জমা দিন।</p>
+        <Link
+          href="/new-member"
+          className="mt-3 inline-flex items-center justify-center rounded-full bg-secondary px-4 py-2 text-xs font-bold text-white"
+        >
+          নতুন সদস্য হন
+        </Link>
+      </div>
       <div className="space-y-3">
         <label className="text-lg font-bold text-primary bengali-copy">
           সদস্য নির্বাচন

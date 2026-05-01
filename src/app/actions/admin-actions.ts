@@ -78,6 +78,7 @@ async function revalidateAdminAndPublic() {
   revalidatePath("/admin/expenses");
   revalidatePath("/admin/approvals");
   revalidatePath("/admin/members");
+  revalidatePath("/admin/financial-analytics");
 }
 
 async function findFundEntryById(id: string) {
