@@ -8,6 +8,8 @@ import { getAppData } from "@/lib/live-data";
 type FundRequestInput = {
   memberId: string;
   amount: number;
+  month: string;
+  year: string;
   note?: string;
 };
 
@@ -22,6 +24,24 @@ function nowIsoDate() {
   return new Date().toISOString();
 }
 
+function buildEntryDate(month: string, year: string) {
+  const monthIndex = Number(month) - 1;
+  const yearNumber = Number(year);
+  if (Number.isNaN(monthIndex) || Number.isNaN(yearNumber)) {
+    return nowIsoDate();
+  }
+  return new Date(yearNumber, monthIndex, 1).toISOString();
+}
+
+function normalizeMonthValue(value: string) {
+  const normalized = value.padStart(2, "0");
+  return /^(0[1-9]|1[0-2])$/.test(normalized) ? normalized : "";
+}
+
+function normalizeYearValue(value: string) {
+  return /^\d{4}$/.test(value) ? value : "";
+}
+
 export async function createFundRequestAction(input: FundRequestInput) {
   const { members } = await getAppData();
   const member = members.find((entry) => entry.id === input.memberId && entry.status === "active");
@@ -34,12 +54,23 @@ export async function createFundRequestAction(input: FundRequestInput) {
     throw new Error("ফান্ডের পরিমাণ কমপক্ষে ১০০ টাকা হতে হবে।");
   }
 
+  const month = normalizeMonthValue(input.month);
+  const year = normalizeYearValue(input.year);
+
+  if (!month || !year) {
+    throw new Error("মাস এবং বছর নির্বাচন করুন।");
+  }
+
+  const submittedDate = buildEntryDate(month, year);
+
   await firebasePush("fundEntries", {
     memberId: member.id,
     memberName: member.name,
     memberMobile: member.mobile,
     amount: input.amount,
-    submittedDate: nowIsoDate(),
+    month,
+    year,
+    submittedDate,
     paymentMethod: "bKash",
     note: input.note?.trim() || "",
     status: "pending",

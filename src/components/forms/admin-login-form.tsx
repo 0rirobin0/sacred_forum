@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
 export function AdminLoginForm() {
   const router = useRouter();
   const [username, setUsername] = useState("admin");
@@ -36,21 +39,19 @@ export function AdminLoginForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
         <label className="text-sm font-bold text-primary/70">Admin Username</label>
-        <input
+        <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none focus:border-primary"
           placeholder="admin"
         />
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-bold text-primary/70">Password</label>
-        <input
+        <Input
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           type="password"
-          className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none focus:border-primary"
           placeholder="Secure password"
         />
       </div>
@@ -61,13 +62,9 @@ export function AdminLoginForm() {
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full rounded-2xl bg-primary px-6 py-4 text-lg font-bold text-primary-foreground shadow-lg disabled:opacity-60"
-      >
+      <Button type="submit" disabled={isPending} className="w-full">
         {isPending ? "লগইন হচ্ছে..." : "অ্যাডমিন প্যানেলে প্রবেশ করুন"}
-      </button>
+      </Button>
     </form>
   );
 }

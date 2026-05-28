@@ -2,15 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getAppData } from "@/lib/live-data";
+import type { FundEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 type FinancialAnalyticsPageProps = {
   searchParams?: Promise<{
     month?: string;
+    year?: string;
     member?: string;
     q?: string;
     status?: string;
@@ -22,34 +30,116 @@ type MonthOption = {
   label: string;
 };
 
-function getMonthKey(value: string) {
+type YearOption = {
+  key: string;
+  label: string;
+};
+
+type DateFilter = {
+  month: string;
+  year: string;
+};
+
+function getDateParts(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  if (Number.isNaN(date.getTime())) return null;
+
+  return {
+    month: String(date.getMonth() + 1).padStart(2, "0"),
+    year: String(date.getFullYear()),
+  };
 }
 
-function buildMonthOptions(dates: string[]): MonthOption[] {
+function normalizeMonthValue(value: string) {
+  const normalized = value.padStart(2, "0");
+  return /^(0[1-9]|1[0-2])$/.test(normalized) ? normalized : "";
+}
+
+function normalizeYearValue(value: string) {
+  return /^\d{4}$/.test(value) ? value : "";
+}
+
+function getFundEntryPeriod(entry: FundEntry) {
+  const month = normalizeMonthValue(entry.month ?? "");
+  const year = normalizeYearValue(entry.year ?? "");
+  if (month && year) {
+    return { month, year };
+  }
+
+  const fallback = getDateParts(entry.approvedDate ?? entry.submittedDate);
+  return fallback ?? { month: "", year: "" };
+}
+
+function getBanglaMonthName(month: number | string): string {
+  const monthNames: Record<number, string> = {
+    1:  "জানুয়ারি",
+    2:  "ফেব্রুয়ারি",
+    3:  "মার্চ",
+    4:  "এপ্রিল",
+    5:  "মে",
+    6:  "জুন",
+    7:  "জুলাই",
+    8:  "আগস্ট",
+    9:  "সেপ্টেম্বর",
+    10: "অক্টোবর",
+    11: "নভেম্বর",
+    12: "ডিসেম্বর",
+  };
+
+  const num = Number(month);
+  return monthNames[num] ?? "-";
+}
+function getLegacyYearMonth(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = normalizeYearValue(match[1]);
+  const month = normalizeMonthValue(match[2]);
+
+  if (!year || !month) return null;
+
+  return { year, month };
+}
+
+function buildMonthOptions(): MonthOption[] {
   const formatter = new Intl.DateTimeFormat("bn-BD", {
     month: "long",
-    year: "numeric",
-  });
-  const uniqueMonths = new Set<string>();
-
-  dates.forEach((date) => {
-    const key = getMonthKey(date);
-    if (key) uniqueMonths.add(key);
   });
 
-  return Array.from(uniqueMonths)
-    .sort((a, b) => (a > b ? -1 : 1))
-    .map((key) => {
-      const [year, month] = key.split("-");
-      const date = new Date(Number(year), Number(month) - 1, 1);
-      return {
-        key,
-        label: formatter.format(date),
-      };
-    });
+  return Array.from({ length: 12 }, (_, index) => {
+    const key = String(index + 1).padStart(2, "0");
+    return {
+      key,
+      label: formatter.format(new Date(2000, index, 1)),
+    };
+  });
+}
+
+function buildYearOptions(entries: FundEntry[]): YearOption[] {
+  const formatter = new Intl.NumberFormat("bn-BD");
+  const uniqueYears = new Set<string>();
+
+  entries.forEach((entry) => {
+    const { year } = getFundEntryPeriod(entry);
+    if (year) uniqueYears.add(year);
+  });
+
+  return Array.from(uniqueYears)
+    .sort((a, b) => Number(b) - Number(a))
+    .map((year) => ({
+      key: year,
+      label: formatter.format(Number(year)),
+    }));
+}
+
+function matchesDateFilter(entry: FundEntry, filter: DateFilter) {
+  const parts = getFundEntryPeriod(entry);
+  if (!parts.year && !parts.month) return false;
+
+  if (filter.year && parts.year !== filter.year) return false;
+  if (filter.month && parts.month !== filter.month) return false;
+
+  return true;
 }
 
 export default async function FinancialAnalyticsPage({
@@ -61,32 +151,39 @@ export default async function FinancialAnalyticsPage({
     redirect("/admin/login");
   }
 
-  const { fundEntries, members } = await getAppData();
+  const { fundEntries, members, summaryStats } = await getAppData();
+  const notificationCount =
+    summaryStats.pendingFundRequests + summaryStats.newMemberRequests;
   const params = await searchParams;
-  const monthParam = params?.month?.trim() ?? "";
+  const rawMonthParam = params?.month?.trim() ?? "";
+  const rawYearParam = params?.year?.trim() ?? "";
+  const legacyYearMonth = getLegacyYearMonth(rawMonthParam);
+  const monthParam = normalizeMonthValue(legacyYearMonth?.month ?? rawMonthParam);
+  const yearParam = normalizeYearValue(rawYearParam || legacyYearMonth?.year || "");
   const memberParam = params?.member?.trim() ?? "";
   const query = params?.q?.trim().toLowerCase() ?? "";
   const statusParam = params?.status?.trim() ?? "paid";
   const isUnpaidView = statusParam === "unpaid";
+  const hasDateFilter = Boolean(monthParam || yearParam);
+  const dateFilter = {
+    month: monthParam,
+    year: yearParam,
+  };
 
   const approvedEntries = fundEntries.filter((entry) => entry.status === "approved");
-  const monthOptions = buildMonthOptions(
-    approvedEntries.map((entry) => entry.approvedDate ?? entry.submittedDate),
-  );
+  const monthOptions = buildMonthOptions();
+  const yearOptions = buildYearOptions(approvedEntries);
   const selectedMember = members.find((member) => member.id === memberParam) ?? null;
 
+  const dateFilteredEntries = approvedEntries.filter((entry) =>
+    matchesDateFilter(entry, dateFilter),
+  );
+
   const memberFilteredEntries = selectedMember
-    ? approvedEntries.filter((entry) => entry.memberId === selectedMember.id)
-    : approvedEntries;
+    ? dateFilteredEntries.filter((entry) => entry.memberId === selectedMember.id)
+    : dateFilteredEntries;
 
-  const monthFilteredEntries = monthParam
-    ? memberFilteredEntries.filter(
-        (entry) =>
-          getMonthKey(entry.approvedDate ?? entry.submittedDate) === monthParam,
-      )
-    : memberFilteredEntries;
-
-  const finalEntries = monthFilteredEntries.filter((entry) => {
+  const finalEntries = memberFilteredEntries.filter((entry) => {
     if (!query) return true;
 
     return (
@@ -103,14 +200,14 @@ export default async function FinancialAnalyticsPage({
     finalEntries.map((entry) => entry.memberId ?? entry.memberMobile),
   ).size;
 
-  const paidMemberIdsForMonth = new Set(
-    (monthParam ? approvedEntries : []).filter(
-      (entry) => getMonthKey(entry.approvedDate ?? entry.submittedDate) === monthParam,
-    ).map((entry) => entry.memberId).filter(Boolean),
+  const paidMemberIdsForPeriod = new Set(
+    (hasDateFilter ? dateFilteredEntries : []).flatMap((entry) =>
+      entry.memberId ? [entry.memberId] : [],
+    ),
   );
   const membersForUnpaidView = selectedMember ? [selectedMember] : members;
-  const unpaidMembers = monthParam
-    ? membersForUnpaidView.filter((member) => !paidMemberIdsForMonth.has(member.id))
+  const unpaidMembers = hasDateFilter
+    ? membersForUnpaidView.filter((member) => !paidMemberIdsForPeriod.has(member.id))
     : [];
   const filteredUnpaidMembers = unpaidMembers.filter((member) => {
     if (!query) return true;
@@ -124,253 +221,261 @@ export default async function FinancialAnalyticsPage({
   const visibleAmount = isUnpaidView ? 0 : totalAmount;
   const visibleCount = isUnpaidView ? filteredUnpaidMembers.length : finalEntries.length;
   const visibleMemberCount = isUnpaidView ? filteredUnpaidMembers.length : uniqueMembers;
-  const hasFilters = Boolean(monthParam || memberParam || params?.q || params?.status);
+  const hasFilters = Boolean(monthParam || yearParam || memberParam || query || params?.status);
 
   return (
     <AdminShell
       activePath="/admin/financial-analytics"
       title="ফান্ড হিস্ট্রি অ্যানালিটিকস"
-      description="মাস, সদস্য ও নাম অনুসারে অনুমোদিত ফান্ড হিস্ট্রি ফিল্টার করে দেখুন।"
+      description="মাস, বছর, সদস্য ও নাম অনুসারে অনুমোদিত ফান্ড হিস্ট্রি ফিল্টার করে দেখুন।"
+      notificationCount={notificationCount}
     >
       <section className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_20px_40px_rgba(0,0,0,0.05)] sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
-              মোট অনুমোদিত জমা
-            </p>
-            <p className="mt-3 headline-display text-3xl font-extrabold text-primary">
-              {formatCurrency(visibleAmount)}
-            </p>
-          </div>
-          <div className="rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_20px_40px_rgba(0,0,0,0.05)] sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
-              মোট ট্রানজাকশন
-            </p>
-            <p className="mt-3 headline-display text-3xl font-extrabold text-primary">
-              {isUnpaidView ? 0 : visibleCount}টি
-            </p>
-          </div>
-          <div className="rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_20px_40px_rgba(0,0,0,0.05)] sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
-              সদস্য সংখ্যা
-            </p>
-            <p className="mt-3 headline-display text-3xl font-extrabold text-primary">
-              {visibleMemberCount} জন
-            </p>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                মোট অনুমোদিত জমা
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="headline-display text-3xl font-extrabold text-primary">
+                {formatCurrency(visibleAmount)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                মোট ট্রানজাকশন
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="headline-display text-3xl font-extrabold text-primary">
+                {isUnpaidView ? 0 : visibleCount}টি
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                সদস্য সংখ্যা
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="headline-display text-3xl font-extrabold text-primary">
+                {visibleMemberCount} জন
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_20px_40px_rgba(0,0,0,0.05)] sm:p-6 lg:p-7">
-          <div className="mb-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
-              Filter Controls
-            </p>
-            <h3 className="mt-2 headline-display text-xl font-extrabold text-primary sm:text-2xl">
-              ফিল্টার
-            </h3>
-          </div>
-
-          <form className="grid gap-4 lg:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
-                মাস নির্বাচন
-              </label>
-              <select
-                name="month"
-                defaultValue={monthParam}
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none"
-              >
-                <option value="">সব মাস</option>
-                {monthOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
-                সদস্য নির্বাচন
-              </label>
-              <select
-                name="member"
-                defaultValue={selectedMember?.id ?? ""}
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none"
-              >
-                <option value="">সব সদস্য</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name} ({member.mobile})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
-                পেমেন্ট স্ট্যাটাস
-              </label>
-              <select
-                name="status"
-                defaultValue={statusParam}
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none"
-              >
-                <option value="paid">Paid Members</option>
-                <option value="unpaid">Unpaid Members</option>
-              </select>
-              {isUnpaidView && !monthParam ? (
-                <p className="text-xs text-secondary bengali-copy">
-                  আনপেইড তালিকা দেখতে মাস নির্বাচন করুন।
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
-                নাম বা পেমেন্ট মেথড
-              </label>
-              <input
-                type="text"
-                name="q"
-                defaultValue={params?.q ?? ""}
-                placeholder="নাম, মোবাইল নম্বর বা পেমেন্ট মেথড লিখুন..."
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none"
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row lg:col-span-4">
-              <button
-                type="submit"
-                className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground sm:min-w-40"
-              >
-                ফিল্টার করুন
-              </button>
-              {hasFilters ? (
-                <Link
-                  href="/admin/financial-analytics"
-                  className="rounded-2xl border border-primary/20 px-5 py-3 text-center text-sm font-bold text-primary sm:min-w-32"
-                >
-                  রিসেট
-                </Link>
-              ) : null}
-            </div>
-          </form>
-        </div>
-
-        <div className="rounded-[2rem] border border-[#ded6c8] bg-[#f1ede4] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.04)] sm:p-6 lg:p-7">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Card>
+          <CardHeader>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
-                {isUnpaidView ? "Unpaid Member Table" : "Approved Fund History"}
+                Filter Controls
               </p>
-              <h3 className="headline-display text-xl font-extrabold text-primary sm:text-2xl">
-                সদস্যভিত্তিক ফান্ড হিস্ট্রি
-              </h3>
+              <CardTitle className="mt-2 text-xl sm:text-2xl">ফিল্টার</CardTitle>
             </div>
-            <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-primary">
-              {visibleCount}টি
-            </span>
-          </div>
+          </CardHeader>
 
-          <div className="admin-table-wrap">
-            {isUnpaidView ? (
-              <table className="admin-table min-w-[860px]">
-                <thead>
-                  <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                    <th className="px-4">সদস্য</th>
-                    <th className="px-4">মোবাইল</th>
-                    <th className="px-4">Member ID</th>
-                    <th className="px-4">ঠিকানা</th>
-                    <th className="px-4">জয়েন তারিখ</th>
-                    <th className="px-4">স্ট্যাটাস</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUnpaidMembers.map((member) => (
-                    <tr
-                      key={member.id}
-                      className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]"
-                    >
-                      <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
-                        {member.name}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/65">{member.mobile}</td>
-                      <td className="px-4 py-4 text-xs font-bold uppercase tracking-[0.18em] text-secondary">
-                        {member.id}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/70 bengali-copy">
-                        {member.address}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/70">
-                        {formatDate(member.joinDate)}
-                      </td>
-                      <td className="rounded-r-[1.25rem] px-4 py-4 text-sm font-semibold text-primary/80">
-                        Unpaid
-                      </td>
-                    </tr>
+          <CardContent>
+            <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
+                  মাস নির্বাচন
+                </label>
+                <Select name="month" defaultValue={monthParam}>
+                  <option value="">সব মাস</option>
+                  {monthOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
                   ))}
-                </tbody>
-              </table>
-            ) : (
-              <table className="admin-table min-w-[980px]">
-                <thead>
-                  <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                    <th className="px-4">সদস্য</th>
-                    <th className="px-4">মোবাইল</th>
-                    <th className="px-4">Member ID</th>
-                    <th className="px-4">তারিখ</th>
-                    <th className="px-4">পেমেন্ট মেথড</th>
-                    <th className="px-4">নোট</th>
-                    <th className="px-4 text-right">পরিমাণ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {finalEntries.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]"
-                    >
-                      <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
-                        {entry.memberName}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/65">{entry.memberMobile}</td>
-                      <td className="px-4 py-4 text-xs font-bold uppercase tracking-[0.18em] text-secondary">
-                        {entry.memberId || "-"}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/70">
-                        {formatDate(entry.approvedDate ?? entry.submittedDate)}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/70">
-                        {entry.paymentMethod}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-primary/60 bengali-copy">
-                        {entry.note || "-"}
-                      </td>
-                      <td className="rounded-r-[1.25rem] px-4 py-4 text-right text-base font-bold text-primary">
-                        {formatCurrency(entry.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {isUnpaidView ? (
-            filteredUnpaidMembers.length === 0 ? (
-              <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/60 bengali-copy">
-                {monthParam
-                  ? "নির্বাচিত মাসে সব সদস্য পেমেন্ট করেছেন।"
-                  : "আনপেইড তালিকা দেখতে মাস নির্বাচন করুন।"}
+                </Select>
               </div>
-            ) : null
-          ) : finalEntries.length === 0 ? (
-            <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/60 bengali-copy">
-              নির্বাচিত ফিল্টারের জন্য কোনো ফান্ড হিস্ট্রি পাওয়া যায়নি।
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
+                  বছর নির্বাচন
+                </label>
+                <Select name="year" defaultValue={yearParam}>
+                  <option value="">সব বছর</option>
+                  {yearOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
+                  সদস্য নির্বাচন
+                </label>
+                <Select name="member" defaultValue={selectedMember?.id ?? ""}>
+                  <option value="">সব সদস্য</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name} ({member.mobile})
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
+                  পেমেন্ট স্ট্যাটাস
+                </label>
+                <Select name="status" defaultValue={statusParam}>
+                  <option value="paid">Paid Members</option>
+                  <option value="unpaid">Unpaid Members</option>
+                </Select>
+                {isUnpaidView && !hasDateFilter ? (
+                  <p className="text-xs text-secondary bengali-copy">
+                    আনপেইড তালিকা দেখতে মাস বা বছর নির্বাচন করুন।
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">
+                  নাম বা পেমেন্ট মেথড
+                </label>
+                <Input
+                  type="text"
+                  name="q"
+                  defaultValue={params?.q ?? ""}
+                  placeholder="নাম, মোবাইল নম্বর বা পেমেন্ট মেথড লিখুন..."
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row md:col-span-2 xl:col-span-5">
+                <Button type="submit" className="sm:min-w-40">
+                  ফিল্টার করুন
+                </Button>
+                {hasFilters ? (
+                  <Link href="/admin/financial-analytics" className="sm:min-w-32">
+                    <Button type="button" variant="outline" className="w-full">
+                      রিসেট
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
+                  {isUnpaidView ? "Unpaid Member Table" : "Approved Fund History"}
+                </p>
+                <CardTitle className="text-xl sm:text-2xl">সদস্যভিত্তিক ফান্ড হিস্ট্রি</CardTitle>
+              </div>
+              <Badge variant="outline">{visibleCount}টি</Badge>
             </div>
-          ) : null}
-        </div>
+          </CardHeader>
+
+          <CardContent>
+            {isUnpaidView ? (
+              <Table className="min-w-215">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>সদস্য</TableHead>
+                    <TableHead>মোবাইল</TableHead>
+                    <TableHead>Member ID</TableHead>
+                    <TableHead>ঠিকানা</TableHead>
+                    <TableHead>জয়েন তারিখ</TableHead>
+                    <TableHead>স্ট্যাটাস</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUnpaidMembers.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="font-semibold text-foreground bengali-copy">
+                        {member.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{member.mobile}</TableCell>
+                      <TableCell className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                        {member.id}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground bengali-copy">
+                        {member.address}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(member.joinDate)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Unpaid</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Table className="min-w-265">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>সদস্য</TableHead>
+                    <TableHead>মোবাইল</TableHead>
+                    <TableHead>Member ID</TableHead>
+                    <TableHead>অনুমোদনের তারিখ</TableHead>
+                    <TableHead>পেমেন্ট মাস</TableHead>
+                    <TableHead>পেমেন্ট মেথড</TableHead>
+                    <TableHead>নোট</TableHead>
+                    <TableHead className="text-right">পরিমাণ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {finalEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-semibold text-foreground bengali-copy">
+                        {entry.memberName}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{entry.memberMobile}</TableCell>
+                      <TableCell className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                        {entry.memberId || "-"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(entry.approvedDate?? entry.submittedDate)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {entry.month && entry.year ? `${getBanglaMonthName(entry.month)} , ${entry.year}` : "-"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {entry.paymentMethod}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground bengali-copy">
+                        {entry.note || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-foreground">
+                        {formatCurrency(entry.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+
+            {isUnpaidView ? (
+              filteredUnpaidMembers.length === 0 ? (
+                <div className="mt-4 rounded-[1.5rem] bg-muted/60 p-5 text-sm text-muted-foreground bengali-copy">
+                  {hasDateFilter
+                    ? "নির্বাচিত সময়ের জন্য সব সদস্য পেমেন্ট করেছেন।"
+                    : "আনপেইড তালিকা দেখতে মাস বা বছর নির্বাচন করুন।"}
+                </div>
+              ) : null
+            ) : finalEntries.length === 0 ? (
+              <div className="mt-4 rounded-[1.5rem] bg-muted/60 p-5 text-sm text-muted-foreground bengali-copy">
+                নির্বাচিত ফিল্টারের জন্য কোনো ফান্ড হিস্ট্রি পাওয়া যায়নি।
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </section>
     </AdminShell>
   );

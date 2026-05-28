@@ -38,6 +38,8 @@ type MemberInput = {
 type ManualFundInput = {
   memberId: string;
   amount: number;
+  month: string;
+  year: string;
   paymentMethod: string;
   note?: string;
 };
@@ -49,6 +51,15 @@ type BreakingNewsInput = {
 
 function nowIsoDate() {
   return new Date().toISOString();
+}
+
+function normalizeMonthValue(value: string) {
+  const normalized = value.padStart(2, "0");
+  return /^(0[1-9]|1[0-2])$/.test(normalized) ? normalized : "";
+}
+
+function normalizeYearValue(value: string) {
+  return /^\d{4}$/.test(value) ? value : "";
 }
 
 async function assertAdmin() {
@@ -77,6 +88,7 @@ async function revalidateAdminAndPublic() {
   revalidatePath("/admin");
   revalidatePath("/admin/expenses");
   revalidatePath("/admin/approvals");
+  revalidatePath("/admin/notifications");
   revalidatePath("/admin/members");
   revalidatePath("/admin/financial-analytics");
 }
@@ -258,6 +270,13 @@ export async function createManualFundEntryAction(input: ManualFundInput) {
     throw new Error("ফান্ডের পরিমাণ কমপক্ষে ১০০ টাকা হতে হবে।");
   }
 
+  const month = normalizeMonthValue(input.month);
+  const year = normalizeYearValue(input.year);
+
+  if (!month || !year) {
+    throw new Error("মাস এবং বছর নির্বাচন করুন।");
+  }
+
   const approvedDate = nowIsoDate();
 
   await firebasePush("fundEntries", {
@@ -265,6 +284,8 @@ export async function createManualFundEntryAction(input: ManualFundInput) {
     memberName: member.name,
     memberMobile: member.mobile,
     amount: input.amount,
+    month,
+    year,
     submittedDate: approvedDate,
     approvedDate,
     paymentMethod: input.paymentMethod.trim() || "Cash",

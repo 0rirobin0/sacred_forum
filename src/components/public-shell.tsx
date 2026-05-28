@@ -11,13 +11,14 @@ const mobileNavItems = [
   { href: "/expenses", label: "খরচ" },
   { href: "/add-fund", label: "ফান্ড জমা দিন" },
   { href: "/new-member", label: "নতুন সদস্য" },
+  { href: "/about", label: "ফোরাম পরিচিতি" },
 ];
 
 const desktopNavItems = [
   { href: "/", label: "Home" },
   { href: "/members", label: "Member List" },
   { href: "/fund-history", label: "Fund History" },
-  { href: "/#about", label: "About" },
+  { href: "/about", label: "About" },
 ];
 
 type PublicShellProps = {
@@ -36,7 +37,7 @@ export function PublicShell({ children, activePath = "/" }: PublicShellProps) {
             </div>
             <div className="min-w-0 space-y-1">
               <p className="headline-display text-xl font-black text-primary md:text-2xl">
-                Sacred Forum
+                হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম
               </p>
               <p className="max-w-full text-[10px] font-medium tracking-[0.14em] text-secondary sm:text-xs">
                 হাজী বাড়ি জামে মসজিদ
@@ -78,7 +79,9 @@ export function PublicShell({ children, activePath = "/" }: PublicShellProps) {
                 <Landmark className="size-5" />
               </div>
               <div>
-                <h3 className="headline-display text-2xl font-bold">Sacred Forum</h3>
+                <h3 className="headline-display text-2xl font-bold">
+                  হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম
+                </h3>
                 <p className="text-xs text-secondary">হাজী বাড়ি জামে মসজিদ</p>
               </div>
             </div>
@@ -101,7 +104,7 @@ export function PublicShell({ children, activePath = "/" }: PublicShellProps) {
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-background/95 px-2 py-2 backdrop-blur lg:hidden">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {mobileNavItems.slice(0, 6).map((item) => (
+          {mobileNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

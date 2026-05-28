@@ -1,7 +1,7 @@
 import type { Hadith } from "@/lib/types";
 
 export const mosqueName = "হাজী বাড়ি জামে মসজিদ";
-export const softwareName = "হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম";
+export const softwareName = "হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম";
 export const mosqueLocation = "মিয়ারচর, হোসনাবাদ, গৌরনদী, বরিশাল।";
 
 export const hadithOfTheDay: Hadith = {

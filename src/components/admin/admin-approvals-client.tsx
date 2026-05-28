@@ -2,22 +2,49 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleDollarSign, Plus, UserPlus2, X } from "lucide-react";
+import Link from "next/link";
+import { CircleDollarSign, Plus, Wallet2, X } from "lucide-react";
 
 import { createManualFundEntryAction } from "@/app/actions/admin-actions";
-import { RequestDecisionButtons } from "@/components/admin/request-decision-buttons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { FundEntry, Member, MemberRequest } from "@/lib/types";
+import type { FundEntry, Member } from "@/lib/types";
 
 type AdminApprovalsClientProps = {
+  currentBalance: number;
+  totalFund: number;
   fundEntries: FundEntry[];
-  memberRequests: MemberRequest[];
   members: Member[];
 };
 
+const monthOptions = Array.from({ length: 12 }, (_, index) => {
+  const key = String(index + 1).padStart(2, "0");
+  const label = new Intl.DateTimeFormat("bn-BD", { month: "long" }).format(
+    new Date(2000, index, 1),
+  );
+  return { key, label };
+});
+
+const yearOptions = (() => {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, index) => {
+    const year = String(currentYear - index);
+    return {
+      key: year,
+      label: new Intl.NumberFormat("bn-BD").format(Number(year)),
+    };
+  });
+})();
+
 export function AdminApprovalsClient({
+  currentBalance,
+  totalFund,
   fundEntries,
-  memberRequests,
   members,
 }: AdminApprovalsClientProps) {
   const router = useRouter();
@@ -25,6 +52,8 @@ export function AdminApprovalsClient({
   const [manualFund, setManualFund] = useState({
     memberId: members[0]?.id ?? "",
     amount: "",
+    month: String(new Date().getMonth() + 1).padStart(2, "0"),
+    year: String(new Date().getFullYear()),
     paymentMethod: "Cash",
     note: "",
   });
@@ -32,8 +61,8 @@ export function AdminApprovalsClient({
   const [message, setMessage] = useState<string | null>(null);
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
 
-  const pendingFunds = fundEntries.filter((entry) => entry.status === "pending");
-  const pendingMembers = memberRequests.filter((entry) => entry.status === "pending");
+  const approvedFunds = fundEntries.filter((entry) => entry.status === "approved");
+  const recentAddedFunds = approvedFunds.slice(0, 8);
 
   function openFundModal() {
     setError(null);
@@ -51,6 +80,8 @@ export function AdminApprovalsClient({
         await createManualFundEntryAction({
           memberId: manualFund.memberId,
           amount: Number(manualFund.amount),
+          month: manualFund.month,
+          year: manualFund.year,
           paymentMethod: manualFund.paymentMethod,
           note: manualFund.note,
         });
@@ -58,6 +89,8 @@ export function AdminApprovalsClient({
           ...current,
           amount: "",
           note: "",
+          month: String(new Date().getMonth() + 1).padStart(2, "0"),
+          year: String(new Date().getFullYear()),
         }));
         setMessage("ম্যানুয়াল ফান্ড এন্ট্রি সফলভাবে যুক্ত হয়েছে।");
         setIsFundModalOpen(false);
@@ -72,7 +105,7 @@ export function AdminApprovalsClient({
     <section className="space-y-6">
       {isFundModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_30px_60px_rgba(0,0,0,0.2)] sm:p-6 lg:p-7">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-border bg-white p-5 shadow-[0_30px_60px_rgba(0,0,0,0.2)] sm:p-6 lg:p-7">
             <div className="mb-6 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-white">
@@ -85,22 +118,21 @@ export function AdminApprovalsClient({
               <button
                 type="button"
                 onClick={() => setIsFundModalOpen(false)}
-                className="flex size-10 items-center justify-center rounded-full border border-primary/15 text-primary"
+                className="flex size-20 items-center justify-center rounded-full border border-primary/15 text-primary"
                 aria-label="Close"
               >
-                <X className="size-5" />
+                <X className="size-10" />
               </button>
             </div>
 
             <form onSubmit={submitManualFund} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary/70 bengali-copy">সদস্য</label>
-                <select
+                <Select
                   value={manualFund.memberId}
                   onChange={(event) =>
                     setManualFund((current) => ({ ...current, memberId: event.target.value }))
                   }
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
                 >
                   {members.length === 0 ? (
                     <option value="">কোনো সদস্য নেই</option>
@@ -111,28 +143,60 @@ export function AdminApprovalsClient({
                       </option>
                     ))
                   )}
-                </select>
+                </Select>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary/70 bengali-copy">পরিমাণ</label>
-                <input
+                <Input
                   value={manualFund.amount}
                   onChange={(event) =>
                     setManualFund((current) => ({ ...current, amount: event.target.value }))
                   }
                   type="number"
                   min={100}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
                   placeholder="৳ ০.০০"
                 />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-primary/70 bengali-copy">মাস</label>
+                  <Select
+                    value={manualFund.month}
+                    onChange={(event) =>
+                      setManualFund((current) => ({ ...current, month: event.target.value }))
+                    }
+                  >
+                    {monthOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-primary/70 bengali-copy">বছর</label>
+                  <Select
+                    value={manualFund.year}
+                    onChange={(event) =>
+                      setManualFund((current) => ({ ...current, year: event.target.value }))
+                    }
+                  >
+                    {yearOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary/70 bengali-copy">
                   পেমেন্ট মেথড
                 </label>
-                <input
+                <Input
                   value={manualFund.paymentMethod}
                   onChange={(event) =>
                     setManualFund((current) => ({
@@ -140,20 +204,18 @@ export function AdminApprovalsClient({
                       paymentMethod: event.target.value,
                     }))
                   }
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
                   placeholder="Cash / bKash / Nagad"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary/70 bengali-copy">নোট</label>
-                <textarea
+                <Textarea
                   value={manualFund.note}
                   onChange={(event) =>
                     setManualFund((current) => ({ ...current, note: event.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
                   placeholder="ঐচ্ছিক তথ্য"
                 />
               </div>
@@ -165,177 +227,147 @@ export function AdminApprovalsClient({
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="submit"
-                  disabled={isPending || members.length === 0}
-                  className="flex-1 rounded-[1.4rem] bg-primary px-6 py-4 text-base font-bold text-white shadow-[0_16px_30px_rgba(0,56,32,0.18)] disabled:opacity-60"
-                >
+                <Button type="submit" disabled={isPending || members.length === 0} className="flex-1">
                   {isPending ? "সংরক্ষণ হচ্ছে..." : "ফান্ড যোগ করুন"}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setIsFundModalOpen(false)}
-                  className="rounded-[1.4rem] border border-primary/15 px-5 py-4 text-base font-bold text-primary"
                 >
                   বাতিল
-                </button>
+                </Button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
 
-      <div className="rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_20px_40px_rgba(0,0,0,0.05)] sm:p-6 lg:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-white">
-              <CircleDollarSign className="size-6" />
+      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <Card className="bg-primary text-primary-foreground">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary-foreground/70">
+                  Total Fund
+                </p>
+                <h3 className="mt-3 headline-display text-2xl font-extrabold sm:text-3xl lg:text-4xl">
+                  {formatCurrency(totalFund)}
+                </h3>
+                <p className="mt-3 text-sm text-primary-foreground/75 bengali-copy sm:text-base">
+                  এখন পর্যন্ত অনুমোদিত সব ফান্ডের মোট পরিমাণ।
+                </p>
+              </div>
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/12 text-white">
+                <Wallet2 className="size-6" />
+              </div>
             </div>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Badge variant="accent" className="bg-white/15 text-white">
+              বর্তমান ব্যালেন্স {formatCurrency(currentBalance)}
+            </Badge>
+            <Badge variant="outline" className="border-white/30 text-white">
+              অনুমোদিত ফান্ড {approvedFunds.length}টি
+            </Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-white">
+                  <CircleDollarSign className="size-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
+                    Add Fund
+                  </p>
+                  <CardTitle className="text-xl sm:text-2xl lg:text-3xl">
+                    ম্যানুয়াল ফান্ড এন্ট্রি
+                  </CardTitle>
+                </div>
+              </div>
+              <Button type="button" onClick={openFundModal} disabled={members.length === 0}>
+                <Plus className="size-4" />
+                ফান্ড যোগ করুন
+              </Button>
+            </div>
+          </CardHeader>
+
+          {message ? (
+            <CardContent>
+              <div className="rounded-2xl bg-primary/10 px-4 py-3 text-sm text-primary bengali-copy">
+                {message}
+              </div>
+            </CardContent>
+          ) : null}
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
-                Add Fund
+                Fund Added History
               </p>
-              <h3 className="headline-display text-xl font-extrabold text-primary sm:text-2xl lg:text-3xl">
-                ম্যানুয়াল ফান্ড এন্ট্রি
-              </h3>
+              <CardTitle className="mt-2 text-xl sm:text-2xl lg:text-3xl">
+                সর্বশেষ ফান্ড হিস্ট্রি
+              </CardTitle>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline">{approvedFunds.length}টি</Badge>
+              <Link
+                href="/admin/financial-analytics"
+                className="rounded-full border border-primary/15 px-4 py-2 text-sm font-bold text-primary"
+              >
+                সব হিস্ট্রি দেখুন
+              </Link>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openFundModal}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
-            disabled={members.length === 0}
-          >
-            <Plus className="size-4" />
-            ফান্ড যোগ করুন
-          </button>
-        </div>
-
-        {message ? (
-          <div className="mt-5 rounded-2xl bg-primary/10 px-4 py-3 text-sm text-primary bengali-copy">
-            {message}
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentAddedFunds.map((entry) => (
+              <div
+                key={entry.id}
+                className="rounded-[1.5rem] border border-border/70 bg-muted/30 p-4 sm:p-5"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-bold text-foreground bengali-copy sm:text-lg">
+                      {entry.memberName}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {entry.memberMobile} • {entry.paymentMethod}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground bengali-copy">
+                      {entry.note?.trim() ? entry.note : "কোনো অতিরিক্ত নোট নেই"}
+                    </p>
+                  </div>
+                  <div className="shrink-0 lg:text-right">
+                    <p className="headline-display text-2xl font-extrabold text-foreground">
+                      {formatCurrency(entry.amount)}
+                    </p>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                      {formatDate(entry.approvedDate ?? entry.submittedDate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : null}
-      </div>
 
-      <div className="rounded-[2rem] border border-[#ded6c8] bg-[#f1ede4] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.04)] sm:p-6 lg:p-7">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="headline-display text-xl font-extrabold text-primary sm:text-2xl lg:text-3xl">
-            পেন্ডিং ফান্ড রিকোয়েস্ট
-          </h3>
-          <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-primary">
-            {pendingFunds.length}টি
-          </span>
-        </div>
-
-        <div className="admin-table-wrap">
-          <table className="admin-table min-w-[920px]">
-            <thead>
-              <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                <th className="px-4">সদস্য</th>
-                <th className="px-4">মোবাইল</th>
-                <th className="px-4">জমার তারিখ</th>
-                <th className="px-4">পেমেন্ট</th>
-                <th className="px-4">নোট</th>
-                <th className="px-4 text-right">পরিমাণ</th>
-                <th className="px-4 text-right">অ্যাকশন</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingFunds.map((entry) => (
-                <tr key={entry.id} className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-                  <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
-                    {entry.memberName}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/65">{entry.memberMobile}</td>
-                  <td className="px-4 py-4 text-sm text-primary/70">
-                    {formatDate(entry.submittedDate)}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/70">{entry.paymentMethod}</td>
-                  <td className="px-4 py-4 text-sm text-primary/60 bengali-copy">
-                    {entry.note || "-"}
-                  </td>
-                  <td className="px-4 py-4 text-right text-base font-bold text-primary">
-                    {formatCurrency(entry.amount)}
-                  </td>
-                  <td className="rounded-r-[1.25rem] px-4 py-4">
-                    <div className="flex justify-end">
-                      <RequestDecisionButtons requestId={entry.id} variant="fund" />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {pendingFunds.length === 0 ? (
-          <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/55 bengali-copy">
-            বর্তমানে কোনো ফান্ড রিকোয়েস্ট অপেক্ষমাণ নেই।
-          </div>
-        ) : null}
-      </div>
-
-      <div className="rounded-[2rem] border border-[#ded6c8] bg-[#f1ede4] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.04)] sm:p-6 lg:p-7">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 items-center justify-center rounded-full bg-[#ffd978] text-primary">
-              <UserPlus2 className="size-6" />
+          {recentAddedFunds.length === 0 ? (
+            <div className="mt-4 rounded-[1.5rem] bg-muted/60 p-5 text-sm text-muted-foreground bengali-copy">
+              এখনো কোনো অনুমোদিত বা যোগ করা ফান্ড হিস্ট্রি নেই।
             </div>
-            <h3 className="headline-display text-xl font-extrabold text-primary sm:text-2xl lg:text-3xl">
-              সদস্য আবেদন
-            </h3>
-          </div>
-          <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-primary">
-            {pendingMembers.length}টি
-          </span>
-        </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
-        <div className="admin-table-wrap">
-          <table className="admin-table min-w-[880px]">
-            <thead>
-              <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                <th className="px-4">নাম</th>
-                <th className="px-4">মোবাইল</th>
-                <th className="px-4">ঠিকানা</th>
-                <th className="px-4">আবেদন তারিখ</th>
-                <th className="px-4">নোট</th>
-                <th className="px-4 text-right">অ্যাকশন</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingMembers.map((request) => (
-                <tr key={request.id} className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-                  <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
-                    {request.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/65">{request.mobile}</td>
-                  <td className="px-4 py-4 text-sm text-primary/70 bengali-copy">
-                    {request.address}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/70">
-                    {formatDate(request.submittedDate)}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/60 bengali-copy">
-                    {request.note || "-"}
-                  </td>
-                  <td className="rounded-r-[1.25rem] px-4 py-4">
-                    <div className="flex justify-end">
-                      <RequestDecisionButtons requestId={request.id} variant="member" />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {pendingMembers.length === 0 ? (
-          <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/55 bengali-copy">
-            নতুন কোনো সদস্য আবেদন অপেক্ষমান নেই।
-          </div>
-        ) : null}
-      </div>
     </section>
   );
 }

@@ -71,6 +71,14 @@ function getMonthKey(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function getFundEntryMonthKey(entry: FundEntry) {
+  if (entry.year && entry.month) {
+    return `${entry.year}-${entry.month}`;
+  }
+
+  return getMonthKey(entry.approvedDate ?? entry.submittedDate);
+}
+
 function buildMonthlyTrend(
   approvedFunds: FundEntry[],
   expenses: ExpenseEntry[],
@@ -83,7 +91,7 @@ function buildMonthlyTrend(
     const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`;
 
     const collection = approvedFunds
-      .filter((entry) => getMonthKey(entry.approvedDate ?? entry.submittedDate) === monthKey)
+      .filter((entry) => getFundEntryMonthKey(entry) === monthKey)
       .reduce((sum, entry) => sum + entry.amount, 0);
 
     const expense = expenses
@@ -195,7 +203,7 @@ export async function getAppData(): Promise<AppData> {
   const todayKey = now.toISOString().slice(0, 10);
 
   const thisMonthApproved = approvedFunds.filter(
-    (entry) => getMonthKey(entry.approvedDate ?? entry.submittedDate) === currentMonthKey,
+    (entry) => getFundEntryMonthKey(entry) === currentMonthKey,
   );
   const thisMonthExpenseItems = expenseEntries.filter(
     (entry) => getMonthKey(entry.date) === currentMonthKey,

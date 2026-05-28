@@ -18,6 +18,8 @@ export type FundEntry = {
   memberName: string;
   memberMobile: string;
   amount: number;
+  month?: string;
+  year?: string;
   submittedDate: string;
   approvedDate?: string;
   paymentMethod: string;

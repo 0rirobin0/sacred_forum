@@ -6,10 +6,11 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function formatDate(value: string) {
+export function formatDate(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
   return new Intl.DateTimeFormat("bn-BD", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date(value));
+  }).format(date);
 }

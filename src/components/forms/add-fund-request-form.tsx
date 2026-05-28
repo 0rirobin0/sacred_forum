@@ -12,11 +12,32 @@ type AddFundRequestFormProps = {
   members: Member[];
 };
 
+const monthOptions = Array.from({ length: 12 }, (_, index) => {
+  const key = String(index + 1).padStart(2, "0");
+  const label = new Intl.DateTimeFormat("bn-BD", { month: "long" }).format(
+    new Date(2000, index, 1),
+  );
+  return { key, label };
+});
+
+const yearOptions = (() => {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, index) => {
+    const year = String(currentYear - index);
+    return {
+      key: year,
+      label: new Intl.NumberFormat("bn-BD").format(Number(year)),
+    };
+  });
+})();
+
 export function AddFundRequestForm({ members }: AddFundRequestFormProps) {
   const router = useRouter();
   const [memberQuery, setMemberQuery] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [month, setMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -69,16 +90,25 @@ export function AddFundRequestForm({ members }: AddFundRequestFormProps) {
       return;
     }
 
+    if (!month || !year) {
+      setError("মাস এবং বছর নির্বাচন করুন।");
+      return;
+    }
+
     startTransition(async () => {
       try {
         await createFundRequestAction({
           memberId: selectedMember.id,
           amount: numericAmount,
+          month,
+          year,
           note,
         });
         setMemberQuery("");
         setAmount("");
         setNote("");
+        setMonth(String(new Date().getMonth() + 1).padStart(2, "0"));
+        setYear(String(new Date().getFullYear()));
         setMessage("আপনার ফান্ড রিকোয়েস্ট গ্রহণ করা হয়েছে এবং এডমিন যাচাইয়ের অপেক্ষায় আছে।");
         router.refresh();
       } catch (submitError) {
@@ -143,6 +173,41 @@ export function AddFundRequestForm({ members }: AddFundRequestFormProps) {
             placeholder="৳ ০০.০০"
             className="w-full border-0 bg-transparent py-5 pl-14 pr-4 text-[2rem] font-bold text-[#667085] outline-none placeholder:text-[#667085]"
           />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-3">
+          <label className="text-lg font-bold text-primary bengali-copy">মাস</label>
+          <div className="relative overflow-hidden rounded-[1.7rem] border border-border/60 bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
+            <select
+              value={month}
+              onChange={(event) => setMonth(event.target.value)}
+              className="w-full border-0 bg-transparent py-5 pl-4 pr-4 text-lg text-[#667085] outline-none"
+            >
+              {monthOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <label className="text-lg font-bold text-primary bengali-copy">বছর</label>
+          <div className="relative overflow-hidden rounded-[1.7rem] border border-border/60 bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
+            <select
+              value={year}
+              onChange={(event) => setYear(event.target.value)}
+              className="w-full border-0 bg-transparent py-5 pl-4 pr-4 text-lg text-[#667085] outline-none"
+            >
+              {yearOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

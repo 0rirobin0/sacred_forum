@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BellRing,
   ChartColumnBig,
   CircleCheckBig,
   CircleDollarSign,
@@ -8,6 +9,9 @@ import {
 } from "lucide-react";
 
 import { LogoutButton } from "@/components/admin/logout-button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 type AdminShellProps = {
@@ -16,91 +20,118 @@ type AdminShellProps = {
     | "/admin/approvals"
     | "/admin/expenses"
     | "/admin/members"
-    | "/admin/financial-analytics";
+    | "/admin/financial-analytics"
+    | "/admin/notifications";
   eyebrow?: string;
   title: string;
   description?: string;
+  notificationCount: number;
   children: React.ReactNode;
 };
 
-const sidebarItems = [
+type SidebarItem = {
+  label: string;
+  icon: typeof LayoutDashboard;
+  href: AdminShellProps["activePath"];
+  hasBadge?: boolean;
+};
+
+const sidebarItems: SidebarItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin" },
-  { label: "Member List", icon: Users2, href: "/admin/members" },
-  { label: "Add Fund and Approvals", icon: CircleCheckBig, href: "/admin/approvals" },
-  { label: "Add Expense", icon: CircleDollarSign, href: "/admin/expenses" },
-  { label: "Financial History", icon: ChartColumnBig, href: "/admin/financial-analytics" },
-] as const;
+  { label: "Notifications", icon: BellRing, href: "/admin/notifications", hasBadge: true },
+  { label: "Members", icon: Users2, href: "/admin/members" },
+  { label: "Add Fund", icon: CircleCheckBig, href: "/admin/approvals" },
+  { label: "Expenses", icon: CircleDollarSign, href: "/admin/expenses" },
+  { label: "Fund History", icon: ChartColumnBig, href: "/admin/financial-analytics" },
+];
 
 export function AdminShell({
   activePath,
-  eyebrow = "Mosque Forum Admin",
+  eyebrow = "হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম অ্যাডমিন",
   title,
   description,
+  notificationCount,
   children,
 }: AdminShellProps) {
   return (
-    <main className="min-h-screen bg-[#f8f4ec] text-primary">
+    <main className="min-h-screen bg-[#f7f4ee] text-foreground">
       <div className="lg:flex">
-        <aside className="flex w-full flex-col border-r border-primary-foreground/15 bg-primary px-4 py-4 text-primary-foreground shadow-[18px_0_40px_rgba(0,56,32,0.28)] sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:h-screen lg:w-90 lg:px-7 lg:py-7">
-          <div>
-            <h1 className="headline-display text-xl font-extrabold leading-tight sm:text-2xl lg:text-3xl">
-              The Sacred Editorial
-            </h1>
-            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-primary-foreground/70 sm:mt-3 sm:text-sm lg:text-base">
-              Administrative Portal
-            </p>
-          </div>
+        <aside className="w-full px-4 py-5 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:px-6 lg:py-8">
+          <Card className="flex h-full flex-col gap-6 border-border/70 bg-white/95 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                Control Center
+              </p>
+              <h1 className="headline-display mt-3 text-2xl font-bold text-primary">
+                হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরাম
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">Admin workspace</p>
+            </div>
 
-          <nav className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-2 md:gap-2.5 lg:mt-14 lg:block lg:space-y-5">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activePath === item.href;
+            <Separator />
 
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={cn(
-                    "flex w-full items-center justify-center gap-2 rounded-[1.05rem] border px-3 py-2 text-center text-xs font-medium leading-snug transition-colors sm:justify-start sm:gap-3 sm:px-4 sm:py-2.5 sm:text-sm md:py-2 md:text-xs lg:gap-4 lg:rounded-r-[1.8rem] lg:rounded-l-[1.35rem] lg:px-5 lg:py-3.5 lg:text-base",
-                    isActive
-                      ? "border-primary-foreground bg-primary-foreground text-primary shadow-[0_10px_18px_rgba(0,0,0,0.12)] lg:border-r-4 lg:border-r-secondary"
-                      : "border-primary-foreground/15 text-primary-foreground/85 hover:border-primary-foreground/30 hover:bg-primary-foreground/10 hover:text-primary-foreground",
-                  )}
-                >
-                  <Icon className="size-4 sm:size-5 lg:size-6" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+            <nav className="space-y-2">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activePath === item.href;
 
-          <div className="mt-6 border-t border-primary-foreground/20 pt-5 lg:mt-auto lg:pt-8">
-            <LogoutButton
-              label="Logout"
-              className="flex items-center gap-3 px-2 py-2 text-sm font-medium text-primary-foreground/75 hover:text-primary-foreground disabled:opacity-60 sm:text-base lg:gap-4 lg:px-4 lg:py-3 lg:text-base"
-            />
-          </div>
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition",
+                      isActive
+                        ? "border-primary/15 bg-primary text-primary-foreground shadow-[0_12px_20px_rgba(0,56,32,0.2)]"
+                        : "border-transparent text-muted-foreground hover:border-border/80 hover:bg-muted/60 hover:text-foreground",
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icon className="size-4" />
+                      {item.label}
+                    </span>
+                    {item.hasBadge ? (
+                      <Badge
+                        variant={isActive ? "accent" : notificationCount > 0 ? "accent" : "outline"}
+                        className={cn(
+                          "min-w-7 bg-red-500 rounded-full text-white justify-center",
+                          isActive && "bg-white/20 text-white",
+                        )}
+                      >
+                        {notificationCount}
+                      </Badge>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="mt-auto">
+              <Separator className="mb-4" />
+              <LogoutButton
+                label="Logout"
+                className="w-full rounded-xl border border-border/70 bg-muted/40 px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
+              />
+            </div>
+          </Card>
         </aside>
 
-        <div className="min-w-0 flex-1 px-3 py-5 text-sm sm:px-5 sm:py-6 sm:text-base md:px-6 md:py-5 lg:px-10 lg:py-8">
-          <header className="mb-6 md:mb-5 lg:mb-10">
+        <div className="min-w-0 flex-1 px-4 pb-10 pt-3 sm:px-6 lg:px-10 lg:pt-8">
+          <header className="mb-6 flex flex-col gap-3 lg:mb-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+              {eyebrow}
+            </p>
             <div>
-              <p className="headline-display text-base italic text-primary/90 sm:text-lg md:text-base lg:text-xl">
-                {eyebrow}
-              </p>
+              <h2 className="headline-display text-2xl font-bold text-primary sm:text-3xl lg:text-4xl">
+                {title}
+              </h2>
+              {description ? (
+                <p className="mt-2 max-w-3xl text-sm text-muted-foreground bengali-copy">
+                  {description}
+                </p>
+              ) : null}
             </div>
           </header>
-
-          <section className="mb-6 border-b border-[#ded6c8] pb-6 md:mb-7 lg:mb-10 lg:pb-8">
-            <h2 className="headline-display text-xl font-extrabold leading-tight text-primary sm:text-2xl md:text-[1.9rem] lg:text-4xl xl:text-5xl">
-              {title}
-            </h2>
-            {description ? (
-              <p className="mt-3 max-w-4xl text-sm text-primary/80 bengali-copy sm:mt-4 sm:text-base lg:mt-5">
-                {description}
-              </p>
-            ) : null}
-          </section>
 
           {children}
         </div>

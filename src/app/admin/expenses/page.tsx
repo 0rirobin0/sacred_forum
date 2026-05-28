@@ -13,12 +13,15 @@ export default async function AdminExpensesPage() {
   }
 
   const { expenseEntries, summaryStats } = await getAppData();
+  const notificationCount =
+    summaryStats.pendingFundRequests + summaryStats.newMemberRequests;
 
   return (
     <AdminShell
       activePath="/admin/expenses"
       title="ব্যয় ব্যবস্থাপনা"
       description="হাজী বাড়ি জামে মসজিদ উন্নয়ন ফোরামের সকল খরচ এখানে নথিভুক্ত করুন এবং অতীতের লেনদেন পর্যবেক্ষণ করুন।"
+      notificationCount={notificationCount}
     >
       <ExpenseEntriesClient
         initialExpenses={expenseEntries}

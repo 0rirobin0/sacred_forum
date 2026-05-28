@@ -8,13 +8,19 @@ import {
   deleteMemberAction,
   upsertMemberAction,
 } from "@/app/actions/admin-actions";
-import { RequestDecisionButtons } from "@/components/admin/request-decision-buttons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { Member, MemberRequest } from "@/lib/types";
+import type { Member } from "@/lib/types";
 
 type AdminMembersClientProps = {
   members: Member[];
-  memberRequests: MemberRequest[];
+  readOnly?: boolean;
 };
 
 type MemberDraft = {
@@ -314,10 +320,7 @@ async function getCanvasPngBytes(canvas: HTMLCanvasElement) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-export function AdminMembersClient({
-  members,
-  memberRequests,
-}: AdminMembersClientProps) {
+export function AdminMembersClient({ members, readOnly = false }: AdminMembersClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
@@ -326,8 +329,6 @@ export function AdminMembersClient({
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const pendingMemberRequests = memberRequests.filter((request) => request.status === "pending");
-
   const filteredMembers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return members;
@@ -446,9 +447,9 @@ export function AdminMembersClient({
 
   return (
     <section className="space-y-6">
-      {isFormOpen ? (
+      {!readOnly && isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-[#ded6c8] bg-white p-5 shadow-[0_30px_60px_rgba(0,0,0,0.2)] sm:p-6 lg:p-7">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-border bg-white p-5 shadow-[0_30px_60px_rgba(0,0,0,0.2)] sm:p-6 lg:p-7">
             <div className="mb-6 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-white">
@@ -469,30 +470,27 @@ export function AdminMembersClient({
             </div>
 
             <form onSubmit={saveMember} className="space-y-5">
-              <input
+              <Input
                 value={draft.name}
                 onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                 placeholder="সদস্যের নাম"
-                className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
               />
-              <input
+              <Input
                 value={draft.mobile}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, mobile: event.target.value }))
                 }
                 placeholder="মোবাইল নম্বর"
-                className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
               />
-              <textarea
+              <Textarea
                 value={draft.address}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, address: event.target.value }))
                 }
                 rows={3}
                 placeholder="ঠিকানা"
-                className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
               />
-              <select
+              <Select
                 value={draft.status}
                 onChange={(event) =>
                   setDraft((current) => ({
@@ -500,11 +498,10 @@ export function AdminMembersClient({
                     status: event.target.value as "active" | "inactive",
                   }))
                 }
-                className="w-full rounded-2xl border border-border bg-background px-4 py-4 outline-none"
               >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
-              </select>
+              </Select>
 
               {message ? (
                 <div className="rounded-2xl bg-primary/10 px-4 py-3 text-sm text-primary bengali-copy">
@@ -518,190 +515,132 @@ export function AdminMembersClient({
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex-1 rounded-[1.4rem] bg-primary px-6 py-4 text-base font-bold text-white disabled:opacity-60"
-                >
+                <Button type="submit" disabled={isPending} className="flex-1">
                   {isPending ? "সংরক্ষণ হচ্ছে..." : draft.id ? "আপডেট করুন" : "সদস্য যোগ করুন"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="rounded-[1.4rem] border border-primary/15 px-5 py-4 text-base font-bold text-primary"
-                >
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
                   বাতিল
-                </button>
+                </Button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
 
-      <div className="rounded-[2rem] border border-[#ded6c8] bg-[#f1ede4] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.04)] sm:p-6 lg:p-7">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="headline-display bengali-copy text-xl font-extrabold text-primary sm:text-2xl lg:text-3xl">
-            পেন্ডিং সদস্য আবেদন
-          </h3>
-          <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-primary">
-            {pendingMemberRequests.length}টি
-          </span>
-        </div>
-
-        <div className="admin-table-wrap">
-          <table className="admin-table min-w-[860px]">
-            <thead>
-              <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                <th className="px-4">নাম</th>
-                <th className="px-4">মোবাইল</th>
-                <th className="px-4">ঠিকানা</th>
-                <th className="px-4">আবেদন তারিখ</th>
-                <th className="px-4">নোট</th>
-                <th className="px-4 text-right">অ্যাকশন</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingMemberRequests.map((request) => (
-                <tr key={request.id} className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-                  <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
-                    {request.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/65">{request.mobile}</td>
-                  <td className="px-4 py-4 text-sm text-primary/70 bengali-copy">
-                    {request.address}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/70">
-                    {formatDate(request.submittedDate)}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/60 bengali-copy">
-                    {request.note || "-"}
-                  </td>
-                  <td className="rounded-r-[1.25rem] px-4 py-4">
-                    <div className="flex justify-end">
-                      <RequestDecisionButtons requestId={request.id} variant="member" />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {pendingMemberRequests.length === 0 ? (
-          <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/55 bengali-copy">
-            কোনো পেন্ডিং সদস্য আবেদন নেই।
+      <Card>
+        <CardHeader>
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <CardTitle className="text-xl sm:text-2xl lg:text-3xl">সদস্য তালিকা</CardTitle>
+              {!readOnly ? (
+                <>
+                  <Button type="button" onClick={openNewMemberModal} size="sm">
+                    নতুন সদস্য যোগ করুন
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={exportMemberListPdf}
+                    disabled={isExporting || filteredMembers.length === 0}
+                  >
+                    <Download className="size-4" />
+                    {isExporting ? "PDF তৈরি হচ্ছে..." : "PDF Export"}
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="নাম বা মোবাইল দিয়ে খুঁজুন..."
+              className="w-full sm:max-w-xs"
+            />
           </div>
-        ) : null}
-      </div>
+        </CardHeader>
 
-      <div className="rounded-[2rem] border border-[#ded6c8] bg-[#f1ede4] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.04)] sm:p-6 lg:p-7">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <h3 className="headline-display text-xl font-extrabold text-primary sm:text-2xl lg:text-3xl">
-              সদস্য তালিকা
-            </h3>
-            <button
-              type="button"
-              onClick={openNewMemberModal}
-              className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-white sm:text-sm"
-            >
-              নতুন সদস্য যোগ করুন
-            </button>
-            <button
-              type="button"
-              onClick={exportMemberListPdf}
-              disabled={isExporting || filteredMembers.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-white px-4 py-2 text-xs font-bold text-primary transition-colors hover:border-primary hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-            >
-              <Download className="size-4" />
-              {isExporting ? "PDF তৈরি হচ্ছে..." : "PDF Export"}
-            </button>
-          </div>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="নাম বা মোবাইল দিয়ে খুঁজুন..."
-            className="w-full rounded-2xl border border-[#e1dbcf] bg-white px-4 py-3 text-sm outline-none sm:max-w-xs"
-          />
-        </div>
+        <CardContent>
+          {!readOnly && message ? (
+            <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/10 px-4 py-3 text-sm text-primary bengali-copy">
+              {message}
+            </div>
+          ) : null}
+          {!readOnly && error ? (
+            <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive bengali-copy">
+              {error}
+            </div>
+          ) : null}
 
-        {message ? (
-          <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/10 px-4 py-3 text-sm text-primary bengali-copy">
-            {message}
-          </div>
-        ) : null}
-        {error ? (
-          <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive bengali-copy">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="admin-table-wrap">
-          <table className="admin-table min-w-[980px]">
-            <thead>
-              <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-primary/60">
-                <th className="px-4">নাম</th>
-                <th className="px-4">মোবাইল</th>
-                <th className="px-4">ঠিকানা</th>
-                <th className="px-4">Member ID</th>
-                <th className="px-4">জয়েন তারিখ</th>
-                <th className="px-4">মোট জমা</th>
-                <th className="px-4">স্ট্যাটাস</th>
-                <th className="px-4 text-right">অ্যাকশন</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="min-w-245">
+            <TableHeader>
+              <TableRow>
+                <TableHead>নাম</TableHead>
+                <TableHead>মোবাইল</TableHead>
+                <TableHead>ঠিকানা</TableHead>
+                <TableHead>Member ID</TableHead>
+                <TableHead>জয়েন তারিখ</TableHead>
+                <TableHead>মোট জমা</TableHead>
+                <TableHead>স্ট্যাটাস</TableHead>
+                {!readOnly ? <TableHead className="text-right">অ্যাকশন</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredMembers.map((member) => (
-                <tr key={member.id} className="bg-white shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-                  <td className="rounded-l-[1.25rem] px-4 py-4 font-bold text-primary bengali-copy">
+                <TableRow key={member.id}>
+                  <TableCell className="font-semibold text-foreground bengali-copy">
                     {member.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/65">{member.mobile}</td>
-                  <td className="px-4 py-4 text-sm text-primary/70 bengali-copy">{member.address}</td>
-                  <td className="px-4 py-4 text-xs font-bold uppercase tracking-[0.18em] text-secondary">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{member.mobile}</TableCell>
+                  <TableCell className="text-muted-foreground bengali-copy">{member.address}</TableCell>
+                  <TableCell className="text-xs font-bold uppercase tracking-[0.18em] text-secondary">
                     {member.id}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-primary/70">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatDate(member.joinDate)}
-                  </td>
-                  <td className="px-4 py-4 text-base font-bold text-primary">
+                  </TableCell>
+                  <TableCell className="font-semibold text-foreground">
                     {formatCurrency(member.totalContribution)}
-                  </td>
-                  <td className="px-4 py-4 text-sm font-semibold text-primary/80">
-                    {member.status === "inactive" ? "inactive" : "active"}
-                  </td>
-                  <td className="rounded-r-[1.25rem] px-4 py-4">
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => editMember(member)}
-                        className="flex size-10 items-center justify-center rounded-[0.9rem] bg-primary text-white"
-                        aria-label={`${member.name} সম্পাদনা করুন`}
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeMember(member.id)}
-                        className="flex size-10 items-center justify-center rounded-[0.9rem] bg-[#ffd7d5] text-[#c62828] disabled:opacity-60"
-                        aria-label={`${member.name} ডিলিট করুন`}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={member.status === "inactive" ? "outline" : "default"}>
+                      {member.status === "inactive" ? "inactive" : "active"}
+                    </Badge>
+                  </TableCell>
+                  {!readOnly ? (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Button
+                          type="button"
+                          size="icon"
+                          onClick={() => editMember(member)}
+                          aria-label={`${member.name} সম্পাদনা করুন`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="destructive"
+                          onClick={() => removeMember(member.id)}
+                          aria-label={`${member.name} ডিলিট করুন`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  ) : null}
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
 
-        {filteredMembers.length === 0 ? (
-          <div className="mt-4 rounded-[1.5rem] bg-white/70 p-5 text-sm text-primary/55 bengali-copy">
-            কোনো সদস্য পাওয়া যায়নি।
-          </div>
-        ) : null}
-      </div>
+          {filteredMembers.length === 0 ? (
+            <div className="mt-4 rounded-[1.5rem] bg-muted/60 p-5 text-sm text-muted-foreground bengali-copy">
+              কোনো সদস্য পাওয়া যায়নি।
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </section>
   );
 }
